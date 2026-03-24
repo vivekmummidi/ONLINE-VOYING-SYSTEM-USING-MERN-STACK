@@ -1,0 +1,59 @@
+const express = require("express");
+const mongoose = require("mongoose");
+const cors = require("cors");
+
+const app = express();
+app.use(cors());
+app.use(express.json());
+
+/* MongoDB Connection */
+mongoose.connect("mongodb://localhost:27017/contacts")
+.then(() => console.log("DB Connected"))
+.catch(err => console.log(err));
+
+/* Schema */
+const contactSchema = new mongoose.Schema({
+    name: String,
+    email: String,
+    phone: String,
+    coords: String,
+    time: String
+});
+
+const Contact = mongoose.model("Contact", contactSchema);
+
+
+// ✅ CREATE (Add Entry)
+app.post("/add", async (req, res) => {
+    const data = new Contact(req.body);
+    await data.save();
+    res.send("Data Saved");
+});
+
+
+// ✅ READ (Get All)
+app.get("/all", async (req, res) => {
+    const data = await Contact.find();
+    res.json(data);
+});
+
+
+// ✅ DELETE
+app.delete("/delete/:id", async (req, res) => {
+    await Contact.findByIdAndDelete(req.params.id);
+    res.send("Deleted");
+});
+
+
+// ✅ SEARCH
+app.get("/search/:name", async (req, res) => {
+    const data = await Contact.find({
+        name: { $regex: req.params.name, $options: "i" }
+    });
+    res.json(data);
+});
+
+
+app.listen(3000, () => {
+    console.log("Server running on port 3000");
+});
