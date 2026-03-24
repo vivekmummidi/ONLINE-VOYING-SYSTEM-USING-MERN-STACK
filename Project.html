@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EliteTrack Contact Management System</title>
+
+<style>
+body{
+font-family:'Segoe UI',sans-serif;
+background:linear-gradient(135deg,#0f2027,#203a43,#2c5364);
+color:white;
+margin:0;
+padding:20px;
+}
+
+.box{
+background:white;
+color:#333;
+padding:25px;
+max-width:800px;
+margin:20px auto;
+border-radius:10px;
+box-shadow:0 10px 30px rgba(0,0,0,0.4);
+}
+
+input{
+padding:10px;
+margin:5px 0;
+width:100%;
+border-radius:5px;
+border:1px solid #ccc;
+}
+
+button{
+padding:10px;
+border:none;
+border-radius:5px;
+cursor:pointer;
+font-weight:bold;
+margin:5px 0;
+}
+
+.btn-main{background:#00d2ff;color:white;width:100%;}
+.btn-gps{background:#f39c12;color:white;}
+.btn-danger{background:#e74c3c;color:white;}
+.btn-blue{background:#3498db;color:white;}
+
+.hidden{display:none;}
+
+table{
+width:100%;
+border-collapse:collapse;
+background:white;
+color:#333;
+margin-top:20px;
+}
+
+th,td{
+padding:10px;
+border-bottom:1px solid #ddd;
+text-align:center;
+}
+
+th{
+background:#34495e;
+color:#00d2ff;
+}
+
+iframe{
+margin-top:20px;
+border-radius:10px;
+}
+</style>
+</head>
+
+<body>
+
+<h1 style="text-align:center;">EliteTrack Contact Management System</h1>
+
+<!-- LOGIN -->
+<div id="login-box" class="box" style="max-width:300px;text-align:center;">
+<h2>Admin Login</h2>
+
+<input type="text" id="adminUser" placeholder="Enter Username">
+<input type="password" id="adminPass" placeholder="Enter Password">
+
+<button class="btn-main" onclick="login()">Login</button>
+</div>
+
+<!-- DASHBOARD -->
+<div id="dashboard" class="hidden">
+
+<div class="box">
+<h2>New Contact Entry</h2>
+
+<input type="text" id="name" placeholder="Name">
+<input type="email" id="email" placeholder="Email">
+<input type="text" id="phone" placeholder="Phone">
+
+<button class="btn-gps" onclick="getLocation()">📍 Get Location</button>
+
+<div id="locationStatus">No location captured</div>
+<input type="hidden" id="coords">
+
+<button class="btn-main" onclick="addEntry()">Add Entry</button>
+<button class="btn-blue" onclick="exportCSV()">Export CSV</button>
+
+<input type="text" id="search" placeholder="Search..." onkeyup="searchEntries()">
+</div>
+
+<!-- CHANGE PASSWORD -->
+<div class="box">
+<h3>Change Password</h3>
+
+<input type="password" id="oldPass" placeholder="Current Password">
+<input type="password" id="newPass" placeholder="New Password">
+<input type="password" id="confirmPass" placeholder="Confirm New Password">
+
+<button class="btn-danger" onclick="changePassword()">Change Password</button>
+</div>
+
+<div class="box">
+
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Name</th>
+<th>Phone</th>
+<th>Coordinates</th>
+<th>Time</th>
+<th>Actions</th>
+</tr>
+</thead>
+
+<tbody id="tableBody"></tbody>
+</table>
+
+<iframe id="mapFrame" width="100%" height="300"></iframe>
+
+</div>
+
+</div>
+
+<script>
+
+/* DEFAULT LOGIN */
+if(!localStorage.getItem("adminUsername")){
+localStorage.setItem("adminUsername","admin");
+}
+
+if(!localStorage.getItem("adminPassword")){
+localStorage.setItem("adminPassword","admin123");
+}
+
+let entries = JSON.parse(localStorage.getItem("entries")) || [];
+let idCounter = entries.length ? entries[entries.length-1].id + 1 : 1;
+
+/* LOGIN */
+function login(){
+
+const username=document.getElementById("adminUser").value;
+const password=document.getElementById("adminPass").value;
+
+const storedUser=localStorage.getItem("adminUsername");
+const storedPass=localStorage.getItem("adminPassword");
+
+if(username===storedUser && password===storedPass){
+
+document.getElementById("login-box").classList.add("hidden");
+document.getElementById("dashboard").classList.remove("hidden");
+
+loadEntries();
+
+}else{
+alert("Invalid Username or Password!");
+}
+
+}
+
+/* CHANGE PASSWORD */
+function changePassword(){
+
+const oldPass=document.getElementById("oldPass").value;
+const newPass=document.getElementById("newPass").value;
+const confirmPass=document.getElementById("confirmPass").value;
+
+const storedPass=localStorage.getItem("adminPassword");
+
+if(oldPass!==storedPass){
+alert("Current password incorrect!");
+return;
+}
+
+if(newPass.length<4){
+alert("Password must be at least 4 characters");
+return;
+}
+
+if(newPass!==confirmPass){
+alert("Passwords do not match!");
+return;
+}
+
+localStorage.setItem("adminPassword",newPass);
+
+alert("Password changed successfully!");
+
+document.getElementById("oldPass").value="";
+document.getElementById("newPass").value="";
+document.getElementById("confirmPass").value="";
+
+}
+
+/* LOAD ENTRIES */
+function loadEntries(){
+
+const tbody=document.getElementById("tableBody");
+tbody.innerHTML="";
+
+entries.forEach(e=>{
+
+const row=document.createElement("tr");
+
+row.innerHTML=
+`
+<td>${e.id}</td>
+<td>${e.name}<br><small>${e.email}</small></td>
+<td>${e.phone}</td>
+<td><code>${e.coords}</code></td>
+<td>${e.time}</td>
+<td>
+<button onclick="viewMap('${e.coords}')">Map</button>
+<button onclick="sendMail('${e.email}')">Mail</button>
+<button onclick="deleteEntry(${e.id})">Del</button>
+</td>
+`;
+
+tbody.appendChild(row);
+
+});
+
+}
+
+/* ADD ENTRY */
+function addEntry(){
+
+const name=document.getElementById("name").value;
+const email=document.getElementById("email").value;
+const phone=document.getElementById("phone").value;
+const coords=document.getElementById("coords").value;
+
+if(!name || !coords){
+alert("Name and Location required!");
+return;
+}
+
+const newEntry={
+id:idCounter++,
+name,
+email,
+phone,
+coords,
+time:new Date().toLocaleString()
+};
+
+entries.push(newEntry);
+
+localStorage.setItem("entries",JSON.stringify(entries));
+
+loadEntries();
+
+document.getElementById("name").value="";
+document.getElementById("email").value="";
+document.getElementById("phone").value="";
+document.getElementById("coords").value="";
+
+document.getElementById("locationStatus").innerText="No location captured";
+
+}
+
+/* DELETE */
+function deleteEntry(id){
+
+entries=entries.filter(e=>e.id!==id);
+
+localStorage.setItem("entries",JSON.stringify(entries));
+
+loadEntries();
+
+}
+
+/* SEARCH */
+function searchEntries(){
+
+const value=document.getElementById("search").value.toLowerCase();
+
+const rows=document.querySelectorAll("#tableBody tr");
+
+rows.forEach(row=>{
+row.style.display=row.innerText.toLowerCase().includes(value)?"":"none";
+});
+
+}
+
+/* EXPORT CSV */
+function exportCSV(){
+
+let csv="ID,Name,Email,Phone,Coordinates,Time\n";
+
+entries.forEach(e=>{
+csv+=`${e.id},${e.name},${e.email},${e.phone},${e.coords},${e.time}\n`;
+});
+
+const blob=new Blob([csv],{type:"text/csv"});
+
+const url=window.URL.createObjectURL(blob);
+
+const a=document.createElement("a");
+
+a.href=url;
+a.download="location_data.csv";
+
+a.click();
+
+}
+
+/* MAP */
+function viewMap(coords){
+document.getElementById("mapFrame").src=`https://www.google.com/maps?q=${coords}&output=embed`;
+}
+
+/* MAIL */
+function sendMail(email){
+window.location.href=`mailto:${email}`;
+}
+
+/* GET LOCATION */
+function getLocation(){
+
+const status=document.getElementById("locationStatus");
+
+if(!navigator.geolocation){
+status.innerText="Geolocation not supported";
+return;
+}
+
+status.innerText="Locating...";
+
+navigator.geolocation.getCurrentPosition(pos=>{
+
+const lat=pos.coords.latitude;
+const lon=pos.coords.longitude;
+
+document.getElementById("coords").value=`${lat},${lon}`;
+
+status.innerText=`Captured: ${lat.toFixed(4)}, ${lon.toFixed(4)}`;
+status.style.color="green";
+
+},()=>{
+
+status.innerText="Location denied";
+status.style.color="red";
+
+});
+
+}
+
+</script>
+
+</body>
+</html>
